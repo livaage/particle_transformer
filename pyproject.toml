@@ -1,0 +1,19 @@
+[project]
+name = "particle-transformer"
+version = "0.1.0"
+description = "Particle Transformer: Jet tagging with transformers"
+dependencies = [
+    "weaver-core>=0.4",
+    "torch>=1.10",             # Or appropriate version for your CUDA/toolkit
+    "torch-scatter",
+    "torch-cluster",
+    "torch-spline-conv",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "pyarrow",
+]
+
+[build-system]
+requires = ["setuptools", "wheel", "torch"]
+build-backend = "setuptools.build_meta"
