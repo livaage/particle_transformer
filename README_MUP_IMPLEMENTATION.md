@@ -39,6 +39,8 @@ We implemented μP for ParticleTransformer to achieve **scale-invariant learning
 
 ### Training & Evaluation
 - **`submit_lr_sweep_muP_only.slurm`**: SLURM script for μP learning rate sweeps
+- **`submit_lr_sweep_baseline.slurm`**: SLURM script for baseline learning rate sweeps
+- **`run_baseline_lr_sweep.py`**: Python script for baseline hyperparameter search
 - **`simple_timing_study.py`**: Performance benchmarking script
 - **`timing_study_results.csv`**: Benchmarking results with uncertainties
 
@@ -65,7 +67,17 @@ This will generate:
 - Console output with performance metrics
 - `timing_study_results.csv` with detailed results including uncertainties
 
-### 3. Submit μP Training Jobs
+### 3. Find Optimal Baseline Learning Rate
+
+```bash
+# Option A: Run baseline LR sweep locally
+python run_baseline_lr_sweep.py
+
+# Option B: Submit baseline LR sweep to cluster
+sbatch submit_lr_sweep_baseline.slurm
+```
+
+### 4. Submit μP Training Jobs
 
 ```bash
 # Submit learning rate sweep for μP models
@@ -136,25 +148,52 @@ The μP implementation enables **hyperparameter transfer**:
 2. **Transfer to Large Model**: Use same learning rate on μP Large (800k params)
 3. **No Retuning Required**: Same learning rate works optimally across scales
 
-### Example Workflow
+### Complete Hyperparameter Transfer Workflow
+
+```bash
+# Step 1: Find optimal learning rate on baseline model
+python run_baseline_lr_sweep.py
+# Output: Recommended learning rate (e.g., 0.001)
+
+# Step 2: Use same learning rate on μP models
+python run_mup_only_lr_sweep.py --lr 0.001
+# This verifies the learning rate transfers correctly
+
+# Step 3: Compare performance
+python simple_timing_study.py
+# Shows computational efficiency gains
+```
+
+### Example Code Workflow
 
 ```python
-# 1. Train small model to find optimal LR
-optimal_lr = 0.001  # Found on μP Small
+# 1. Find optimal LR on baseline (1.8M params)
+baseline_results = run_baseline_lr_sweep([0.0001, 0.001, 0.01])
+optimal_lr = baseline_results['recommended_lr']  # e.g., 0.001
 
-# 2. Use same LR on large model
-large_model = make_mup_model(
+# 2. Use same LR on μP small model (50k params)
+mup_small = make_mup_model(
     input_dim=7, 
     num_classes=5,
-    # Large architecture
+    embed_dims=[32, 32, 32, 32],
+    ffn_ratios=[4, 4, 4, 4],
+    num_heads=[2, 2, 2, 2],
+    num_layers=4
+)
+
+# 3. Use same LR on μP large model (800k params)
+mup_large = make_mup_model(
+    input_dim=7, 
+    num_classes=5,
     embed_dims=[128, 128, 128, 128, 128, 128, 128, 128],
     ffn_ratios=[4, 4, 4, 4, 4, 4, 4, 4],
     num_heads=[8, 8, 8, 8, 8, 8, 8, 8],
     num_layers=8
 )
 
-# 3. Train with same learning rate - no retuning needed!
-optimizer = torch.optim.AdamW(large_model.parameters(), lr=optimal_lr)
+# 4. Train all models with same learning rate - no retuning needed!
+optimizer_small = torch.optim.AdamW(mup_small.parameters(), lr=optimal_lr)
+optimizer_large = torch.optim.AdamW(mup_large.parameters(), lr=optimal_lr)
 ```
 
 ## 🔧 Troubleshooting
